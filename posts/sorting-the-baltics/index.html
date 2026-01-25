@@ -16,32 +16,39 @@
 	<p>The <a href="https://cldr.unicode.org/" target="_blank">Unicode Common Locale Data Repository</a> (CLDR) contains, as the name suggests, a bunch of locale data. This includes high-quality translations of names for countries and regions, which is exactly what we need. You can manually download the data <a href="https://unicode.org/Public/cldr" target="_blank">here</a> or run the script below.</p>
 
     <pre><code>#!/bin/bash
-	LATEST_VERSION=48.1
-	wget https://unicode.org/Public/cldr/$LATEST_VERSION/cldr-common-$LATEST_VERSION.zip
-	unzip cldr-common-$LATEST_VERSION.zip "common/main/*" -d cldr-data</code></pre>
+
+LATEST_VERSION=48.1
+wget https://unicode.org/Public/cldr/$LATEST_VERSION/cldr-common-$LATEST_VERSION.zip
+unzip cldr-common-$LATEST_VERSION.zip "common/main/*" -d cldr-data</code></pre>
     
     <p>The downloaded folder contains one xml file per supported language variety. From each file, we extract all <code>&lt;territory&gt;</code> tags, inside of which are the names of the countries. We are only interested in the tags of type "EE", "LT" or "LV" &mdash; representing Estonia, Lithuania and Latvia, respectively. Files that do not have data for all three countries are ignored. The parsing function below implements these steps. Note that the country names are always returned in the desired order, from north to south.</p>
 
     <pre><code>import xml.etree.ElementTree as ET
-	def parse(path: str) -> list | None:
-	    tree = ET.parse(path)
-	    root = tree.getroot()
-	    territories = root.find("localeDisplayNames/territories")
-	    if territories is None:
-	        return
-	    TARGETS = ["EE", "LV", "LT"]
-	    result = {}
-	    for t in territories.findall("territory"):
-	        if (t_type := t.get("type")) in TARGETS:
-	            result[t_type] = t.text.lower()
-	        if len(result) == len(TARGETS):
-	            return [result[c] for c in TARGETS]</code></pre>
+
+def parse(path: str) -> list | None:
+    tree = ET.parse(path)
+    root = tree.getroot()
+
+    territories = root.find("localeDisplayNames/territories")
+    if territories is None:
+        return
+
+    TARGETS = ["EE", "LV", "LT"]
+    result = {}
+
+    for t in territories.findall("territory"):
+        
+        if (t_type := t.get("type")) in TARGETS:
+            result[t_type] = t.text.lower()
+
+        if len(result) == len(TARGETS):
+            return [result[c] for c in TARGETS]</code></pre>
     
     <h2>Sorting it out</h2>
 	<p>Now that the data collection is complete, it is time to put things in order &mdash; alphabetical order to be precise. Recall that the mnemonic works for a language if the names of the Baltic states in that language appear in alphabetical order. For example, the Baltic countries' names in Tarifit (a Berber language spoken in northern Morocco) are <i>istunya</i>, <i>latevya</i>, <i>litwanya</i>. If we sort these names, we get <i>istunya</i>, <i>latevya</i>, <i>litwanya</i>. The order did not change and therefore, the mnenomic works in Tarifit. Implementing this in code is straightforward.</p>
 
     <pre><code>def in_alphabetical_order(names: list[str]) -> bool:
-	    return sorted(names) == names</code></pre>
+    return sorted(names) == names</code></pre>
     
     <p>Or is it? When dealing with human languages, things are never so straightforward. The above solution works fine when dealing with English, but how does it handle non-Latin characters? To answer that question, we need to take a look under the hood.</p>
 	<p>Python stores strings as sequences of Unicode code points. A Unicode code point is a hexadecimal value that represents a character. For example, the character "A" is represented by the code point <code>U+0041</code>. Python's built-in <code>sorted()</code> function uses these code points to perform the sorting, e.g. <code>U+0041</code> comes before <code>U+0042</code> (which represents "B"). As you can see, this works for English but it breaks down quickly for other languages.</p>
@@ -49,9 +56,10 @@
 	<p>To make matters even more complicated, there are many language-specific sorting rules. For example, French treats é and e as the same letter whereas Spanish considers ñ and n as distinct letters. Thus, we need to take into account the alphabets of each language and its particular sorting rules. This is called <i>locale-aware</i> sorting. Luckily, I am not the first person to run into this problem. The aforementioned CLDR also contains sorting rules for each language. To access these rules, we import the <a href="https://icu.unicode.org/" target="_blank">International Components for Unicode</a> library, which uses CLDR in the background.</p>
 
     <pre><code>import icu
-	def in_alphabetical_order(words: list[str], language: str) -> bool:
-	    collator = icu.Collator.createInstance(icu.Locale(language))
-	    return sorted(words, key=collator.getSortKey) == words</code></pre>
+
+def in_alphabetical_order(words: list[str], language: str) -> bool:
+    collator = icu.Collator.createInstance(icu.Locale(language))
+    return sorted(words, key=collator.getSortKey) == words</code></pre>
     
     <p>Before we put everything together, you may wonder, as did I, how sorting works for right-to-left languages. For example, we know that the mnemonic works in English but if we were to reverse the names and then sort them, we would discover that the order had changed, indicating that the mnemonic does not work in English (<i>ainotse</i>, <i>aivtal</i>, <i>ainauhtil</i> becomes <i>ainauhtil</i>, <i>ainotse</i>, <i>aivtal</i>). Does that mean we need to reverse all the words from right-to-left languages before sorting them?</p>
 	<p>No. As it turns out, characters (or code points) are stored in <i>logical</i> order, as opposed to visual or reading order. In other words, the first character of a word is always at index 0. Python does not care about whether the first character is displayed on the left or right side of the screen &mdash; that is a <i>rendering</i> issue and therefore, does not affect our program logic.</p>
@@ -60,21 +68,26 @@
 	<p>Now that we have all the building blocks, it is time to put together the final solution. We iterate over every xml file in the CLDR folder and extract the Baltic state names, check whether they are in alphabetical order, and store the results in a csv file.</p>
 
     <pre><code>import os
-	import csv
-	cldr_directory = "cldr-data"
-	header = ["language", "estonia", "latvia", "lithuania", "in_order"]
-	data = [header]
-	for filename in os.listdir(cldr_directory):
-	    path = os.path.join(cldr_directory, filename)
-	    names = parse(path)
-	    if names is None:
-	        continue
-	    language = filename.removesuffix(".xml")
-	    in_order = in_alphabetical_order(names, language)
-	    data.append([language, *names, in_order])
-	with open("results.csv", "w") as file:
-	    writer = csv.writer(file)
-	    writer.writerows(data)</code></pre>
+import csv
+
+cldr_directory = "cldr-data"
+header = ["language", "estonia", "latvia", "lithuania", "in_order"]
+data = [header]
+
+for filename in os.listdir(cldr_directory):
+    path = os.path.join(cldr_directory, filename)
+
+    names = parse(path)
+    if names is None:
+        continue
+
+    language = filename.removesuffix(".xml")
+    in_order = in_alphabetical_order(names, language)
+    data.append([language, *names, in_order])
+
+with open("results.csv", "w") as file:
+    writer = csv.writer(file)
+    writer.writerows(data)</code></pre>
     
     <p>The results are in! The mnemonic works for 195 out of 243 languages, or about 80.2%. So, there you go, that is our final answer. I also included some bonus facts for you below.</p>
 	<ul>

@@ -22,6 +22,16 @@ def save(html: str, path: str) -> None:
     with open(path, "w") as f:
         f.write(html)
 
+def extract_content(cell: dict) -> str:
+    source = cell["source"]
+
+    if cell["cell_type"] == "markdown":
+        # Removing empty lines and joining with tabs is purely for the aesthetics of the html.
+        source = [s for s in source if s.strip()]
+        return "\t".join(source)
+
+    return "".join(source)
+
 def build_home(env: Environment) -> None:
     template = env.get_template("templates/home.html")
 
@@ -47,9 +57,7 @@ def build_post(env: Environment, path: str) -> None:
 
     cells = notebook["cells"]
     for cell in cells:
-        # Removing empty lines and joining with tabs is purely for the aesthetics.
-        source = [s for s in cell["source"] if s.strip()]
-        cell["content"] = "\t".join(source)
+        cell["content"] = extract_content(cell)
     
     metadata = get_metadata(path)
     html = template.render(title=metadata["title"], cells=cells)
