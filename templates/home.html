@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Pondering Panda</title>
+</head>
+<body>
+    <h1>The Pondering Panda</h1>
+    <p>Greetings, stranger! I am Panda and here you can find all my ponders.</p>
+
+    <h2>Posts</h2>
+    {% if posts %}
+    <ul>
+        {% for post in posts %}
+        <li>[{{ post.date }}] <a href="{{ post.url }}">{{ post.title }}</a></li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>Still in the pondering phase...</p>
+    {% endif %}
+</body>
+</html>
