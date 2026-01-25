@@ -12,7 +12,7 @@
 	<p>Our <i>plan de campagne</i> is straightforward: collect the Baltic countries' names in as many languages as possible. Then, for each language, check whether the names are in alphabetical order. It sounds like a walk in the park, but that usually means we are going for a hike. So, we better get started!</p>
 
     <h2>Data collection</h2>
-	<p>The first step in our <i>plan de campagne</i> is collecting the Baltic countries' names in as many languages as possible. Initially, I used Google Translator to translate the country names to all 133 supported languages. However, while inspecting the output, I realised I had no way to assess the quality of the translations and, by extension, the quality of the final answer. We need a more reliable data source.</p>
+	<p>The first step in our <i>plan de campagne</i> is collecting the Baltic countries' names in as many languages as possible. Initially, I used Google Translator to translate the countries' names to all 133 supported languages. However, while inspecting the output, I realised I had no way to assess the quality of the translations and, by extension, the quality of the final answer. I want a more reliable data source.</p>
 	<p>The <a href="https://cldr.unicode.org/" target="_blank">Unicode Common Locale Data Repository</a> (CLDR) contains, as the name suggests, a bunch of locale data. This includes high-quality translations of names for countries and regions, which is exactly what we need. You can manually download the data <a href="https://unicode.org/Public/cldr" target="_blank">here</a> or run the script below.</p>
 
     <pre><code>#!/bin/bash
@@ -21,7 +21,7 @@ LATEST_VERSION=48.1
 wget https://unicode.org/Public/cldr/$LATEST_VERSION/cldr-common-$LATEST_VERSION.zip
 unzip cldr-common-$LATEST_VERSION.zip "common/main/*" -d cldr-data</code></pre>
     
-    <p>The downloaded folder contains one xml file per supported language variety. From each file, we extract all <code>&lt;territory&gt;</code> tags, inside of which are the names of the countries. We are only interested in the tags of type "EE", "LT" or "LV" &mdash; representing Estonia, Lithuania and Latvia, respectively. Files that do not have data for all three countries are ignored. The parsing function below implements these steps. Note that the country names are always returned in the desired order, from north to south.</p>
+    <p>The downloaded folder contains one xml file per supported language variety. From each file, we extract all <code>&lt;territory&gt;</code> tags, inside of which are the names of the countries. We are only interested in the tags of type "EE", "LT" or "LV" &mdash; representing Estonia, Lithuania and Latvia, respectively. Files that do not have data for all three countries are ignored. The parsing function below implements these steps. Note that the countries are always returned in the desired order, from north to south.</p>
 
     <pre><code>import xml.etree.ElementTree as ET
 
@@ -62,15 +62,15 @@ def in_alphabetical_order(words: list[str], language: str) -> bool:
     return sorted(words, key=collator.getSortKey) == words</code></pre>
     
     <p>Before we put everything together, you may wonder, as did I, how sorting works for right-to-left languages. For example, we know that the mnemonic works in English but if we were to reverse the names and then sort them, we would discover that the order had changed, indicating that the mnemonic does not work in English (<i>ainotse</i>, <i>aivtal</i>, <i>ainauhtil</i> becomes <i>ainauhtil</i>, <i>ainotse</i>, <i>aivtal</i>). Does that mean we need to reverse all the words from right-to-left languages before sorting them?</p>
-	<p>No. As it turns out, characters (or code points) are stored in <i>logical</i> order, as opposed to visual or reading order. In other words, the first character of a word is always at index 0. Python does not care about whether the first character is displayed on the left or right side of the screen &mdash; that is a <i>rendering</i> issue and therefore, does not affect our program logic.</p>
+	<p>No. As it turns out, characters (or code points) are stored in <i>logical</i> order, as opposed to visual or reading order. In other words, everything in memory is stored from left-to-right and consequently, the first character of a word is always at index 0. Python does not care about whether the first character is displayed on the left or right side of the screen &mdash; that is a <i>rendering</i> issue and therefore, does not affect our program logic.</p>
 
     <h2>Conclusion</h2>
-	<p>Now that we have all the building blocks, it is time to put together the final solution. We iterate over every xml file in the CLDR folder and extract the Baltic state names, check whether they are in alphabetical order, and store the results in a csv file.</p>
+	<p>Now that we have all the building blocks, it is time to put together the final solution. We iterate over every xml file in the CLDR folder and our parsing function extracts the names of the Baltic states. Then, we check whether the names are in alphabetical order with our locale-aware sorting function. Lastly, the results are saved to a csv file.</p>
 
     <pre><code>import os
 import csv
 
-cldr_directory = "cldr-data"
+cldr_directory = "cldr-data/common/main"
 header = ["language", "estonia", "latvia", "lithuania", "in_order"]
 data = [header]
 
