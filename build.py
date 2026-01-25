@@ -12,8 +12,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--home", help="Build the homepage.", action="store_true")
     return parser.parse_args()
 
-def get_metadata(article: str) -> dict:
-    metadata_file = os.path.join(article, "metadata.json")
+def get_metadata(path: str) -> dict:
+    metadata_file = os.path.join(path, "metadata.json")
 
     with open(metadata_file, "r") as f:
         return json.load(f)
